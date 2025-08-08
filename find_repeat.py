@@ -38,19 +38,21 @@ def compute_hash(img_path):
     except:
         return None, img_path
 
-def generate_id_parallel(folder_path):
+def generate_id_parallel(folder_path, hash_path, record_path):
     """
     generate hash values of pictures from folder_path.
+    hash_path and record_path are locations of past results.
     returns lists of repeated images (updated and new) and a dictionary of current hashes
     """
 
-    with open('stored_info\\hash.json', 'r') as f:
+    with open(hash_path, 'r') as f:
         hash_dict = json.load(f)
         if hash_dict:
-            hash_dict = {imagehash.hex_to_hash(hash_value): value for hash_value, value in hash_dict.items()}
+            hash_dict = {imagehash.hex_to_hash(hash_value): value
+                         for hash_value, value in hash_dict.items()}
             # convert stored hex string into imagehash format
         old_pictures = [value for value in hash_dict.values()]
-    with open('stored_info\\repeat.json', 'r') as f:
+    with open(record_path, 'r') as f:
         old_rep_list = json.load(f)
     # get hash values and old repeated pictures from the current file
 
@@ -86,12 +88,12 @@ def generate_id_parallel(folder_path):
 
     return updated_rep_list,new_rep_list, string_hash_dict
 
-def store_info(repeat_list, hash_dictionary):
+def store_info(repeat_list, hash_dictionary, hash_path, record_path):
     """store hash values of pictures from repeat_list"""
 
-    with open('stored_info\\hash.json', 'w') as fp:
+    with open(hash_path, 'w') as fp:
         json.dump(hash_dictionary, fp, indent=4)
-    with open('stored_info\\repeat.json', 'w') as fp:
+    with open(record_path, 'w') as fp:
         json.dump(repeat_list, fp, indent=4)
 
 def show_repeated_images(repeat_list):
