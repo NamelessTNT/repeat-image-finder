@@ -1,18 +1,15 @@
 from tkinter import *
 from tkinter import ttk, filedialog
 from tkinter.ttk import *
+import tkinter.messagebox as messagebox
 
-import json
 import os
 import time
 import ctypes
+from send2trash import send2trash
 from PIL import Image, ImageTk
 
 import find_repeat
-
-# todo: finish prev & next button logic
-# todo: index demonstration
-# deletion marked by boxes
 
 class RepeatFinder:
     """calls the find_repeat function and controls which repeated pair to show"""
@@ -23,6 +20,7 @@ class RepeatFinder:
         self._record = _record_path
         self.repeat_list = []
         self.index = 0
+        self.trash_files = []
 
     def check_repeat(self):
         """calls the repeat finder and saves the result"""
@@ -34,7 +32,7 @@ class RepeatFinder:
         # call and store
         self.repeat_list = new_list
 
-    def index_step(self, flag, pic1, pic2):
+    def index_step(self, flag):
         """change index value based on the flag"""
 
         if self.repeat_list:
@@ -56,16 +54,46 @@ class RepeatFinder:
 
     def export_record(self):
         """export the record"""
-        return self.repeat_list[self.index]
+        if self.repeat_list:
+            return self.repeat_list[self.index]
+        else:
+            return None
+
+    def get_record_length(self):
+        """return the length of the record"""
+        if self.repeat_list:
+            return len(self.repeat_list)
+        else:
+            return None
+
+    def reset_index(self):
+        """reset the index"""
+        self.index = 0
 
     def get_index(self):
         return self.index
+
+    def delete_record(self, pic1, pic2):
+        """add filepaths to the deletion list and execute deletion"""
+
+        if pic1.get_var():
+            self.trash_files.append(pic1.get_path())
+        if pic2.get_var():
+            self.trash_files.append(pic2.get_path())
+        if (self.index + 1) == self.get_record_length():
+            message = messagebox.askokcancel(title="Confirm deletion"
+                                             ,message=
+                                             f"Are you sure you want to delete {len(self.trash_files)} images?")
+            if message:
+                for item in self.trash_files:
+                    send2trash(item)
+                print(f"Successfully deleted {len(self.trash_files)} files.")
 
 
 class ImageViewer:
     """draws a picture in a frame, containing information like date and image size"""
 
-    def __init__(self, master, image_path):
+    def __init__(self, master, image_path=""):
         self.master = master
         self.image_path = image_path
         self.var = IntVar()
@@ -75,18 +103,27 @@ class ImageViewer:
         self.textbox = None
         # save widget information in the object for editing
 
-        self.image = Image.open(image_path)
-        self.photo = ImageTk.PhotoImage(self.image.resize((250, 250)))
-        # puts the image in an object to avoid cleaning
+        try:
+            self.image = Image.open(image_path)
+            self.photo = ImageTk.PhotoImage(self.image.resize((250, 250)))
+            # puts the image in an object to avoid cleaning
+        except AttributeError:
+            self.image = Image.new("RGB", (250, 250), "#f0f0f0")
+            self.photo = ImageTk.PhotoImage(self.image.resize((250, 250)))
+        # deal with empty strings
 
         self.create_widget()
 
     def generate_text(self):
         """generate text for the textbox"""
 
-        last_modified = time.strftime("%Y-%m-%d %H:%M:%S",
-                                      time.localtime(os.path.getmtime(self.image_path)))
-        file_size = os.path.getsize(self.image_path) / 1024
+        try:
+            last_modified = time.strftime("%Y-%m-%d %H:%M:%S",
+                                          time.localtime(os.path.getmtime(self.image_path)))
+            file_size = os.path.getsize(self.image_path) / 1024
+        except FileNotFoundError:
+            return ""
+        # if the input image_path is an empty string, the function would return an empty string too
         info = 'Image path: ' + self.image_path.replace("\\", '/') + \
                '\nImage size: ' + str(self.image.size) + \
                f'\nFile size: {file_size:.2f} kB' + \
@@ -131,15 +168,41 @@ class ImageViewer:
     def get_var(self):
         return self.var.get()
 
+    def get_path(self):
+        return self.image_path
+
 
 def refresh_state(finder: RepeatFinder, label: Label,
-                  pic1: ImageViewer, pic2: ImageViewer):
+                  pic1: ImageViewer, pic2: ImageViewer,
+                  record_length:StringVar, current_pos:StringVar):
     """cooperate with the refresh button"""
+
     if finder.repeat_list:
         label.configure(text="Complete!", foreground="#25AD34")
+        finder.reset_index()
+        record_length.set(str(finder.get_record_length()))
+        # get the number of repeated records and show it
+
         pic1.modify_viewer(finder.export_record()[0])
         pic2.modify_viewer(finder.export_record()[1])
+        current_pos.set(str(finder.get_index() + 1))
+        # modify picture and initial info
+
     main_window.update()
+
+def step(finder: RepeatFinder, pic1: ImageViewer, pic2: ImageViewer,
+         record_length:StringVar, record_index:StringVar, flag:int):
+    """receives Prev and Next button event and act accordingly"""
+
+    if finder.repeat_list:
+        finder.index_step(flag)
+        record_length.set(str(finder.get_record_length()))
+        record_index.set(str(finder.get_index() + 1))
+        # show numbers
+
+        pic1.modify_viewer(finder.export_record()[0])
+        pic2.modify_viewer(finder.export_record()[1])
+        # modify pictures
 
 def get_path(receiver:StringVar, op_type:str):
     """
@@ -184,7 +247,7 @@ file_frame = LabelFrame(main_window, text="Files")
 file_frame.pack(side="left", fill="y", padx=10, pady=10)
 # create frame for initial data collection
 
-folder_path = StringVar(file_frame, value="D:\\30242\\Pictures\\Captured\\bg")
+folder_path = StringVar(file_frame, value="")
 hash_path = StringVar(file_frame,
                       value="D:\\30242\\Documents\\Practice\\RepeatImageFinder\\stored_info\\hash.json")
 record_path = StringVar(file_frame,
@@ -217,7 +280,8 @@ start_button = Button(file_frame, text="Start", width=10,
 indicator_label = Label(file_frame, text="Waiting...", foreground="#EB5049")
 
 refresh_button = Button(file_frame, text="Refresh", width=10,
-                        command=lambda: refresh_state(repeat_finder, indicator_label, upper_box, lower_box))
+                        command=lambda: refresh_state(repeat_finder, indicator_label,
+                                                      upper_box, lower_box, rep_num, current_num))
 # define widgets with their functions and bindings
 
 Label(file_frame, text="Image Path", font=("LXGW Wenkai", 12)).pack(padx=10, pady=(30, 0))
@@ -240,13 +304,14 @@ tab_image = LabelFrame(main_window, text="Image Comparison", labelanchor="nw")
 tab_image.pack(side="left", fill="y", padx=10, pady=10)
 # create actual tabs
 
-pic_frame1 = Frame(tab_image)
-pic_frame2 = Frame(tab_image)
+pic_frame1 = LabelFrame(tab_image, text="Picture I")
+pic_frame2 = LabelFrame(tab_image, text="Picture II")
 
-upper_box = ImageViewer(pic_frame1, "testpic/aa.jpg")
-lower_box = ImageViewer(pic_frame2, "testpic/Aya-bg.jpg")
+upper_box = ImageViewer(pic_frame1)
+lower_box = ImageViewer(pic_frame2)
 
 pic_frame1.pack(side="top", padx=10, pady=10)
+Separator(tab_image, orient="horizontal").pack(fill="x", padx=25, pady=(10, 0))
 pic_frame2.pack(side="bottom", padx=10, pady=10)
 
 option_frame = Frame(main_window)
@@ -254,17 +319,26 @@ option_frame.pack(side="right", padx=10, pady=10)
 
 Label(option_frame, text="Total").pack(side="top", padx=10, pady=(10, 0))
 rep_num = StringVar(option_frame, value="0")
-Label(option_frame, textvariable=rep_num).pack(side="top")
+Label(option_frame, textvariable=rep_num, font=("Maple Mono NF CN Medium", 9)).pack(side="top")
 Label(option_frame, text="Repeats").pack(side="top", padx=10, pady=(0, 10))
 
 prev_button = Button(option_frame, text="< Prev")
+prev_button.configure(command=lambda: step(repeat_finder, upper_box, lower_box,
+                                           rep_num, current_num, -1))
 prev_button.pack(side="top", padx=10, pady=10)
+
+confirm_button = Button(option_frame, text="Confirm")
+confirm_button.configure(command=lambda: repeat_finder.delete_record(upper_box, lower_box))
+confirm_button.pack(side="top", padx=10, pady=10)
+
 next_button = Button(option_frame, text="> Next")
+next_button.configure(command=lambda: step(repeat_finder, upper_box, lower_box,
+                                           rep_num, current_num, 2))
 next_button.pack(side="top", padx=10, pady=10)
 
-Label(option_frame, text="Current").pack(side="top", padx=10, pady=10)
+Label(option_frame, text="Current").pack(side="top", padx=10, pady=(10, 0))
 current_num = StringVar(option_frame, value="0")
-Label(option_frame, textvariable=current_num).pack(side="top", padx=10, pady=10)
+Label(option_frame, textvariable=current_num, font=("Maple Mono NF CN Medium", 9)).pack(side="top")
 # content in option_frame
 
 main_window.mainloop()
