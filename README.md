@@ -2,7 +2,10 @@
 
 ### Introduction
 This is a script that finds repeated images in a folder and shows it on a window for you to pick which ones to keep and which ones to delete.
-This script uses **imagehash** to identify different pictures. It's only sensitive to pictures with similar overall structure so this is only used to find **highly similar pictures** (often different copies of a single picture).
+This script uses [imagehash](https://github.com/JohannesBuchner/imagehash) to identify different pictures. It's only sensitive to pictures with similar overall structure so this is only used to find **highly similar pictures** (often different copies of a single picture).
+Fonts used in GUI:
+- [LXGW Wenkai](https://github.com/lxgw/LxgwWenKai)
+- [Maple mono](https://github.com/subframe7536/maple-font)
 
 ### How to use
 - Open command line in the script folder and run `python window.py`.

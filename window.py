@@ -249,9 +249,9 @@ file_frame.pack(side="left", fill="y", padx=10, pady=10)
 
 folder_path = StringVar(file_frame, value="")
 hash_path = StringVar(file_frame,
-                      value="D:\\30242\\Documents\\Practice\\RepeatImageFinder\\stored_info\\hash.json")
+                      value="stored_info/hash.json")
 record_path = StringVar(file_frame,
-                        value="D:\\30242\\Documents\\Practice\\RepeatImageFinder\\stored_info\\repeat.json")
+                        value="stored_info/repeat.json")
 # path variables
 
 repeat_finder = RepeatFinder(folder_path, hash_path, record_path)
