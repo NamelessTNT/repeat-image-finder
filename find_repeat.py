@@ -3,7 +3,7 @@ import json
 
 from PIL import Image
 import imagehash
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -27,15 +27,11 @@ def create_path(folder):
 def compute_hash(img_path):
     """compute hash of an image"""
 
-    ignored_pics = ['D:\\30242\\Pictures\\PhonePicture\\QQ\\Image_21691146758701.png']
-    # pictures to ignore
-    if (img_path in ignored_pics) or img_path == '':
-        return None, img_path
-
     try:
         img = Image.open(img_path).convert('L').resize((8, 8), Image.Resampling.LANCZOS)
         return imagehash.average_hash(img), img_path
-    except:
+    except Exception as e:
+        print(f"Failed to compute hash of {img_path}: {e}")
         return None, img_path
 
 def generate_id_parallel(folder_path, hash_path, record_path):
@@ -81,7 +77,7 @@ def generate_id_parallel(folder_path, hash_path, record_path):
             count += 1
             percent = count / total * 100
             if count % 100 == 0:
-                print(f"Processed {count} images, progress at {percent}%")
+                print(f"Processed {count} images, progress at {percent:.2f}%")
 
     updated_rep_list = old_rep_list + new_rep_list
     string_hash_dict = {str(hash_dict_element): val for hash_dict_element, val in hash_dict.items()}
@@ -96,34 +92,34 @@ def store_info(repeat_list, hash_dictionary, hash_path, record_path):
     with open(record_path, 'w') as fp:
         json.dump(repeat_list, fp, indent=4)
 
-def show_repeated_images(repeat_list):
-    """show repeated images"""
-
-    title_font = {'family': ["LXGW WenKai", "DejaVu Sans"]}
-    # customized font
-    count = 0
-    for img_paths in repeat_list:
-        plt.figure(figsize=(10, 15))
-
-        for index, img_path in enumerate(img_paths):
-            plt.subplot(1, 3, index * 2 + 1)
-            # place the pictures at the sides of the plot block
-            ax = plt.gca()
-
-            try:
-                img = Image.open(img_path)
-            except:
-                print(f"Error reading image {img_path}.")
-                continue
-
-            ori_size = img.size
-            plt.imshow(img)
-            plt.title(os.path.basename(img_path) + '\n' + str(ori_size), fontdict=title_font)
-            ax.axes.xaxis.set_visible(False)
-            ax.axes.yaxis.set_visible(False)
-
-            print(os.path.basename(img_path))
-
-        count += 1
-        print(f"Repeated pair {count}")
-        plt.show()
+# def show_repeated_images(repeat_list):
+#     """show repeated images"""
+#
+#     title_font = {'family': ["LXGW WenKai", "DejaVu Sans"]}
+#     # customized font
+#     count = 0
+#     for img_paths in repeat_list:
+#         plt.figure(figsize=(10, 15))
+#
+#         for index, img_path in enumerate(img_paths):
+#             plt.subplot(1, 3, index * 2 + 1)
+#             # place the pictures at the sides of the plot block
+#             ax = plt.gca()
+#
+#             try:
+#                 img = Image.open(img_path)
+#             except:
+#                 print(f"Error reading image {img_path}.")
+#                 continue
+#
+#             ori_size = img.size
+#             plt.imshow(img)
+#             plt.title(os.path.basename(img_path) + '\n' + str(ori_size), fontdict=title_font)
+#             ax.axes.xaxis.set_visible(False)
+#             ax.axes.yaxis.set_visible(False)
+#
+#             print(os.path.basename(img_path))
+#
+#         count += 1
+#         print(f"Repeated pair {count}")
+#         plt.show()

@@ -21,6 +21,7 @@ class RepeatFinder:
         self.repeat_list = []
         self.index = 0
         self.trash_files = []
+        self.decision_records = {}
 
     def check_repeat(self):
         """calls the repeat finder and saves the result"""
@@ -73,14 +74,52 @@ class RepeatFinder:
     def get_index(self):
         return self.index
 
-    def delete_record(self, pic1, pic2):
+    def add_delete_record(self, pic1, pic2):
         """add filepaths to the deletion list and execute deletion"""
 
+        item = [0, 0]
+        # record switch states
         if pic1.get_var():
-            self.trash_files.append(pic1.get_path())
+            pic1.change_indicator_color("#EB5049")
+            # change to red if selected
+            item[0] = 1
+            if pic1.get_path() not in self.trash_files:
+                self.trash_files.append(pic1.get_path())
+            # avoid adding repeated record
+        else:
+            pic1.change_indicator_color("#25AD34")
+
         if pic2.get_var():
-            self.trash_files.append(pic2.get_path())
-        if (self.index + 1) == self.get_record_length():
+            pic2.change_indicator_color("#EB5049")
+            item[1] = 1
+            if pic2.get_path() not in self.trash_files:
+                self.trash_files.append(pic2.get_path())
+        else:
+            pic2.change_indicator_color("#25AD34")
+
+        self.decision_records[str(self.index)] = item
+
+    def set_viewer_button_state(self, pic1, pic2):
+        """set the viewer's checkbutton state"""
+
+        states = self.decision_records[str(self.index)]
+        if states[0]:
+            pic1.change_indicator_color("#EB5049")
+            pic1.set_var(1)
+        else:
+            pic1.change_indicator_color("#25AD34")
+            pic1.set_var(0)
+
+        if states[1]:
+            pic2.change_indicator_color("#EB5049")
+            pic2.set_var(1)
+        else:
+            pic2.change_indicator_color("#25AD34")
+            pic2.set_var(0)
+
+    def execute_deletion(self):
+        """delete selected files"""
+        if self.trash_files:
             message = messagebox.askokcancel(title="Confirm deletion"
                                              ,message=
                                              f"Are you sure you want to delete {len(self.trash_files)} images?")
@@ -88,6 +127,15 @@ class RepeatFinder:
                 for item in self.trash_files:
                     send2trash(item)
                 print(f"Successfully deleted {len(self.trash_files)} files.")
+
+                index_delete = []
+                for index, indicator in self.decision_records.items():
+                    if indicator[0] or indicator[1]:
+                        index_delete.append(int(index))
+                index_delete.sort(reverse=True)
+                for index in index_delete:
+                    self.repeat_list.pop(index)
+                self.decision_records = {}
 
 
 class ImageViewer:
@@ -101,13 +149,14 @@ class ImageViewer:
 
         self.canvas = None
         self.textbox = None
+        self.select_canvas = None
         # save widget information in the object for editing
 
         try:
             self.image = Image.open(image_path)
             self.photo = ImageTk.PhotoImage(self.image.resize((250, 250)))
             # puts the image in an object to avoid cleaning
-        except AttributeError:
+        except (AttributeError, FileNotFoundError):
             self.image = Image.new("RGB", (250, 250), "#f0f0f0")
             self.photo = ImageTk.PhotoImage(self.image.resize((250, 250)))
         # deal with empty strings
@@ -133,7 +182,7 @@ class ImageViewer:
     def create_widget(self):
         """create the widgets"""
 
-        self.textbox = Text(master=self.master, width=48, height=8, font=("Maple Mono NF CN Medium", 10))
+        self.textbox = Text(master=self.master, width=45, height=8, font=("Maple Mono NF CN Medium", 10))
         self.textbox.insert(END, self.generate_text())
         self.textbox.config(state="disabled")
         # create textbox
@@ -144,9 +193,16 @@ class ImageViewer:
 
         checkbox = Checkbutton(master=self.master, text="Delete", variable=self.var)
 
+        self.select_canvas = Canvas(master=self.master, width=30, height=self.photo.height())
+        self.select_canvas.create_rectangle(0, 0,
+                                            15, self.photo.height(),
+                                            outline="#f0f0f0", width=2, fill="#f0f0f0")
+        # make the rectangle invisible at first
+
         self.canvas.pack(side="left", padx=10, pady=10)
         self.textbox.pack(side="left", padx=10, pady=10)
         checkbox.pack(side="left", padx=10, pady=10)
+        self.select_canvas.pack(side="left", padx=(5, 0), pady=10)
 
     def modify_viewer(self, image_path):
         """update information according to image_path"""
@@ -165,8 +221,17 @@ class ImageViewer:
         self.textbox.config(state="disabled")
         # textbox should be enabled first to edit its information
 
+    def change_indicator_color(self, color):
+        """change checkbox color"""
+        self.select_canvas.create_rectangle(0, 0,
+                                            15, self.photo.height(),
+                                            outline="#f0f0f0", width=2, fill=color)
+
     def get_var(self):
         return self.var.get()
+
+    def set_var(self, var):
+        self.var.set(var)
 
     def get_path(self):
         return self.image_path
@@ -185,6 +250,8 @@ def refresh_state(finder: RepeatFinder, label: Label,
 
         pic1.modify_viewer(finder.export_record()[0])
         pic2.modify_viewer(finder.export_record()[1])
+        pic1.change_indicator_color("#f0f0f0")
+        pic2.change_indicator_color("#f0f0f0")
         current_pos.set(str(finder.get_index() + 1))
         # modify picture and initial info
 
@@ -202,7 +269,13 @@ def step(finder: RepeatFinder, pic1: ImageViewer, pic2: ImageViewer,
 
         pic1.modify_viewer(finder.export_record()[0])
         pic2.modify_viewer(finder.export_record()[1])
-        # modify pictures
+        pic1.change_indicator_color("#f0f0f0")
+        pic2.change_indicator_color("#f0f0f0")
+        # modify pictures and set background color to default
+
+        if str(finder.get_index()) in finder.decision_records.keys():
+            finder.set_viewer_button_state(pic1, pic2)
+        # set checkbox variable and the color bar accordingly
 
 def get_path(receiver:StringVar, op_type:str):
     """
@@ -317,6 +390,9 @@ pic_frame2.pack(side="bottom", padx=10, pady=10)
 option_frame = Frame(main_window)
 option_frame.pack(side="right", padx=10, pady=10)
 
+Label(option_frame, text="OPTIONS",
+      font=("LXGW Wenkai", 9, "bold")).pack(side="top", padx=10, pady=(0, 110))
+# dummy for symmetry
 Label(option_frame, text="Total").pack(side="top", padx=10, pady=(10, 0))
 rep_num = StringVar(option_frame, value="0")
 Label(option_frame, textvariable=rep_num, font=("Maple Mono NF CN Medium", 9)).pack(side="top")
@@ -328,7 +404,7 @@ prev_button.configure(command=lambda: step(repeat_finder, upper_box, lower_box,
 prev_button.pack(side="top", padx=10, pady=10)
 
 confirm_button = Button(option_frame, text="Confirm")
-confirm_button.configure(command=lambda: repeat_finder.delete_record(upper_box, lower_box))
+confirm_button.configure(command=lambda: repeat_finder.add_delete_record(upper_box, lower_box))
 confirm_button.pack(side="top", padx=10, pady=10)
 
 next_button = Button(option_frame, text="> Next")
@@ -340,5 +416,9 @@ Label(option_frame, text="Current").pack(side="top", padx=10, pady=(10, 0))
 current_num = StringVar(option_frame, value="0")
 Label(option_frame, textvariable=current_num, font=("Maple Mono NF CN Medium", 9)).pack(side="top")
 # content in option_frame
+
+delete_button = Button(option_frame, text="Delete")
+delete_button.configure(command=lambda: repeat_finder.execute_deletion())
+delete_button.pack(side="bottom", padx=10, pady=(110, 0), ipady=10)
 
 main_window.mainloop()
